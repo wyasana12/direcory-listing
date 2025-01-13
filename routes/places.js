@@ -1,59 +1,30 @@
 const express = require('express');
-const Place = require('../models/Place');
-const { placeSchema } = require('../schemas/place');
 const wrapAsync = require('../utils/wrapAsync');
-const ErrorHandler = require('../utils/ErrorHandler');
+const PlaceController = require('../controllers/places.js');
 const isValidObjectId = require('../middlewares/isValidObjectId');
-const isAuth = require('../middlewares/isAuth');
+const isAuth = require('../middlewares/isAuth.js');
+const { isAuthorPlace } = require('../middlewares/isAuthor');
+const { validatePlace } = require('../middlewares/validator');
+const upload = require('../config/multer.js');
 
 const router = express.Router();
 
-const validatePlace = (req, res, next) => {
-    const { error } = placeSchema.validate(req.body);
-    if (error) {
-        const msg = error.details.map(el => el.message).join(',');
-        return next(new ErrorHandler(msg, 400));
-    } else {
-        next();
-    }
-}
+router.route('/')
+    .get(wrapAsync(PlaceController.index))
+    // .post(isAuth, validatePlace, wrapAsync(PlaceController.store))
+    .post(isAuth, upload.array('image', 5), (req, res) => {
+        console.log(req.files);
+        console.log(req.body);
+        res.send('it works');
+    })
 
-router.get('/', wrapAsync(async (req, res) => {
-    const places = await Place.find();
-    res.render('places/index', { places });
-}));
+router.get('/create', isAuth, wrapAsync(PlaceController.create));
 
-router.get('/create', isAuth, wrapAsync(async (req, res) => {
-    res.render('places/create');
-}));
+router.route('/:id')
+    .get(isValidObjectId('/places'), wrapAsync(PlaceController.show))
+    .put(isAuth, isAuthorPlace, isValidObjectId('/places'),validatePlace, wrapAsync(PlaceController.update))
+    .delete(isAuth, isAuthorPlace, isValidObjectId('/places'),wrapAsync(PlaceController.delete))
 
-router.post('/', isAuth, validatePlace, wrapAsync(async (req, res, next) => {
-    const place = new Place(req.body.place);
-    await place.save();
-    req.flash('success_msg', 'Place added successfully');
-    res.redirect('/places');
-}));
-
-router.get('/:id', isValidObjectId('/places'), wrapAsync(async (req, res) => {
-    const place = await Place.findById(req.params.id).populate('review');
-    res.render('places/show', { place });
-}));
-
-router.get('/:id/edit', isAuth, isValidObjectId('/places'),wrapAsync(async (req, res) => {
-    const place = await Place.findById(req.params.id);
-    res.render('places/edit', { place });
-}));
-
-router.put('/:id', isAuth, isValidObjectId('/places'),validatePlace, wrapAsync(async (req, res) => {
-    await Place.findByIdAndUpdate(req.params.id, { ...req.body.place });
-    req.flash('success_msg', 'Place updated successfully');
-    res.redirect('/places');
-}));
-
-router.delete('/:id', isAuth, isValidObjectId('/places'),wrapAsync(async (req, res) => {
-    await Place.findByIdAndDelete(req.params.id);
-    req.flash('success_msg', 'Place deleted successfully');
-    res.redirect('/places');
-}));
+router.get('/:id/edit', isAuth, isAuthorPlace, isValidObjectId('/places'),wrapAsync(PlaceController.edit));
 
 module.exports= router;

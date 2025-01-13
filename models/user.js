@@ -7,7 +7,11 @@ const userSchema = new schema({
         type: String,
         required: true,
         unique: true,
-    }
+    },
+    username: {
+        type: String,
+        required: true, // Tambahkan ini
+    },
 });
 
 userSchema.plugin(passportLocalMongoose);
